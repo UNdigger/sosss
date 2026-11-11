@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d1422">
+<title>AcousticNet · 声波上网实验</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#131c2c;--panel2:#19243a;--border:#2b3b53;--text:#ecf4ff;--muted:#9aadc7;--accent:#65d9c8;--purple:#a2b8ff;--warn:#ffcb78}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 70% -10%,#214063 0%,transparent 37%),var(--bg)}
+main{max-width:670px;margin:0 auto;padding:30px 18px 70px}
+.pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:650;letter-spacing:.09em;color:var(--accent);border:1px solid #3a756c;background:#112d31;border-radius:30px;padding:7px 11px}
+h1{font-size:32px;line-height:1.16;letter-spacing:-.8px;margin:15px 0 10px}
+.subtitle{color:var(--muted);font-size:14px;line-height:1.75;margin:0 0 22px}
+.panel{padding:20px;border-radius:18px;background:linear-gradient(135deg,rgba(24,35,55,.99),rgba(16,25,42,.98));border:1px solid var(--border);box-shadow:0 14px 44px rgba(0,0,0,.13);margin-bottom:14px}
+.panel h2{font-size:16px;margin:0 0 15px}
+.gap{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.small{font-size:12px;color:var(--muted);line-height:1.7}
+.label{font-size:12px;color:var(--muted);letter-spacing:.02em}
+.site{display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;border:1px solid var(--border);border-radius:11px;margin-bottom:9px;background:rgba(255,255,255,.02)}
+.site:last-child{margin-bottom:0}
+.site:has(input:checked){border-color:var(--accent);background:#173039}
+.site input{accent-color:#6bdfc9;width:17px;height:17px;flex:0 0 auto}
+.site strong{font-size:14px}.site span{font-size:12px;color:var(--muted);display:block;margin-top:2px}
+button{border:0;cursor:pointer;font:inherit;border-radius:12px;min-height:46px;padding:12px 14px;font-weight:700}
+button:disabled{opacity:.5;cursor:not-allowed}
+.primary{width:100%;background:var(--accent);color:#072525;font-size:15px}
+.secondary{width:100%;background:#263750;color:#e4effe;border:1px solid #3d506b;font-size:13px}
+.buttonrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:9px}
+.status{display:flex;gap:11px;align-items:center;padding:13px;background:#0c1525;border-radius:11px;border:1px solid #2c3e54}
+.dot{height:11px;width:11px;flex:0 0 auto;border-radius:50%;background:var(--purple);box-shadow:0 0 0 4px rgba(162,184,255,.13)}
+.status strong{font-size:14px}
+.track{height:5px;border-radius:4px;background:#2d3d51;overflow:hidden;margin:13px 0 4px}
+.track div{height:100%;width:0;background:var(--accent);transition:width .3s ease}
+canvas{display:block;width:100%;height:90px;border:1px solid #2d405c;border-radius:9px;background:linear-gradient(180deg,#0d1b30,#101b2a);margin:15px 0}
+.meta{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.result{white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:1.7;padding:13px 14px;background:#0b1624;border:1px solid #2a3c52;border-radius:12px;min-height:70px;margin:0}
+.log{max-height:180px;overflow:auto;font-size:12px;line-height:1.8;color:#a4c2d5;font-family:ui-monospace,Consolas,monospace}
+.note{border-left:2px solid var(--warn);padding:9px 12px;color:#c8d6e8;background:#282536;font-size:12px;line-height:1.7;border-radius:0 9px 9px 0}
+.footer{font-size:11px;color:#91a1b6;text-align:center;line-height:1.8;margin-top:22px}
+@media(max-width:380px){h1{font-size:28px}.buttonrow{grid-template-columns:1fr}.panel{padding:16px}}
+</style>
+</head>
+<body>
+<main>
+  <div class="pill">◉ ACOUSTICNET / v0.4 LAB</div>
+  <h1>让手机通过声音<br>访问互联网。</h1>
+  <p class="subtitle">无需手机 Wi‑Fi 或移动数据。浏览器生成声波，Windows 电脑充当联网中继，再通过空气将网页摘要传回手机。</p>
+  <section class="panel">
+    <div class="gap"><h2>01 / 选择测试网站</h2><span class="label">PC 独立联网</span></div>
+    <label class="site"><input type="radio" name="site" value="E" checked><div><strong>Example.com</strong><span>推荐先测试这个，网页很简单</span></div></label>
+    <label class="site"><input type="radio" name="site" value="P"><div><strong>Python.org</strong><span>验证真实 HTTPS 网页标题</span></div></label>
+    <label class="site"><input type="radio" name="site" value="W"><div><strong>Wikipedia.org</strong><span>验证另一个 HTTPS 网站</span></div></label>
+  </section>
+  <section class="panel">
+    <div class="gap"><h2>02 / 声波链路</h2><span id="connection" class="label">正在检查浏览器...</span></div>
+    <div class="status"><span class="dot" id="indicator"></span><div><strong id="phase">准备就绪</strong><div id="detail" class="small">先在电脑运行 windows_gateway.py，再在手机开始</div></div></div>
+    <canvas id="wave" width="590" height="90" aria-label="收发音频波形"></canvas>
+    <div class="meta"><span id="samplerate">FSK · 200 bps</span><span id="meter">等待开始</span></div>
+    <div class="track"><div id="progress"></div></div>
+    <button id="full" class="primary">发送请求并通过麦克风接收结果</button>
+    <div class="buttonrow"><button id="send" class="secondary">仅发送（不需要麦克风）</button><button id="selftest" class="secondary">本机编解码自检</button></div>
+    <p class="small" style="margin-bottom:0">手机音量先调到约 40–60%，距电脑麦克风约 10–30 cm。实验使用可听到的 1200/2400 Hz 声音。</p>
+  </section>
+  <section class="panel">
+    <h2>03 / 从互联网取回的信息</h2>
+    <pre id="result" class="result">尚未收到回应。这里将显示电脑从真实网站获取的 HTTP 状态、网页标题和简短文字。</pre>
+    <p class="small">这是短消息的应用层网络验证，不是虚拟网卡；还不能直接在手机浏览器打开任意完整网页。</p>
+  </section>
+  <section class="panel">
+    <h2>实验日志</h2>
+    <div id="logs" class="log">• 页面已加载，音频代码完全在本地执行。</div>
+  </section>
+  <div class="note">离线实验：必须先把本页在手机上打开，保持页面不关闭，再关闭手机的 Wi‑Fi 和移动数据。注意 PC 不能依赖这台手机热点上网。麦克风权限通常需要 HTTPS 或受浏览器支持的本地文件页面。</div>
+  <div class="footer">Experimental • 2‑FSK 200 bit/s · CRC16 · 单次短包 · 半双工<br>仅用于验证音频与互联网中继，不保证每次空气链路解码成功。</div>
+</main>
+<script>
+// AcousticNet v0.4 — shared browser sound modem. Standalone/no network dependencies.
+const ACOUSTIC = (() => {
+  const BAUD = 200;
+  const F0 = 1200, F1 = 2400;
+  const PREAMBLE = new Uint8Array([85,85,85,85,85,85]);
+  const SYNC = new Uint8Array([0xD3,0x91,0xA5,0x6C]);
+  const MAX_PAYLOAD = 190;
+  const KIND_REQUEST = 1, KIND_RESPONSE = 2;
+
+  function crc16(data) {
+    let c=0xFFFF;
+    for(const b of data){
+      c ^= b<<8;
+      for(let i=0;i<8;i++) c=(((c<<1) ^ ((c&0x8000)?0x1021:0)) & 65535);
+    }
+    return c;
+  }
+  function frame(kind,payload){
+    if(!(kind===KIND_REQUEST || kind===KIND_RESPONSE)) throw new Error('invalid packet type');
+    if(payload.length>MAX_PAYLOAD) throw new Error('payload too large');
+    const out=new Uint8Array(PREAMBLE.length + SYNC.length + 2 + payload.length + 2);
+    out.set(PREAMBLE,0);out.set(SYNC,PREAMBLE.length);
+    const p=PREAMBLE.length+SYNC.length;
+    out[p]=kind;out[p+1]=payload.length;out.set(payload,p+2);
+    const c=crc16(out.subarray(p,p+2+payload.length));
+    out[p+2+payload.length]=c>>8;
+    out[p+3+payload.length]=c&255;
+    return out;
+  }
+  function bitsFromBytes(data){
+    const arr=new Uint8Array(data.length*8);
+    let j=0;
+    for(const b of data)for(let shift=7;shift>=0;shift--)arr[j++]=(b>>shift)&1;
+    return arr;
+  }
+  function modulate(kind,payload,sr){
+    const bits=bitsFromBytes(frame(kind,payload));
+    const n=Math.ceil(bits.length*sr/BAUD);
+    const lead=Math.round(0.18*sr),tail=Math.round(0.12*sr);
+    const out=new Float32Array(lead+n+tail);
+    for(let i=0;i<n;i++){
+      const index=Math.min(bits.length-1,Math.floor(i*BAUD/sr));
+      const freq=bits[index]?F1:F0;
+      const t=i/sr-index/BAUD;
+      out[i+lead]=0.50*Math.sin(2*Math.PI*freq*t);
+    }
+    return out;
+  }
+  function bytesFromBits(bits, pos, len){
+    const res=new Uint8Array(len);
+    for(let j=0;j<len;j++){
+      let b=0;
+      for(let k=0;k<8;k++)b=(b<<1)|bits[pos+j*8+k];
+      res[j]=b;
+    }
+    return res;
+  }
+  function decode(audio,sr,desiredKind=KIND_RESPONSE){
+    if(audio.length<sr*.5)return null;
+    const symbol=sr/BAUD;
+    const n=Math.round(symbol*0.78);
+    const pad=Math.round(symbol*.11);
+    const syncBits=bitsFromBytes(SYNC);
+    const t0sin=new Float64Array(n),t0cos=new Float64Array(n),
+          t1sin=new Float64Array(n),t1cos=new Float64Array(n);
+    for(let j=0;j<n;j++){
+      const x=j/sr*2*Math.PI;
+      t0sin[j]=Math.sin(F0*x);t0cos[j]=Math.cos(F0*x);
+      t1sin[j]=Math.sin(F1*x);t1cos[j]=Math.cos(F1*x);
+    }
+    for(let phase=0;phase<6;phase++){
+      const offset=Math.round(phase*symbol/6);
+      const nb=Math.max(0,Math.floor((audio.length-offset)/symbol));
+      const bits=new Uint8Array(nb);
+      let actual=0;
+      for(let i=0;i<nb;i++){
+        const start=Math.round(offset+i*symbol)+pad;
+        if(start+n>=audio.length)break;
+        let s0=0,c0=0,s1=0,c1=0;
+        for(let j=0;j<n;j++){
+          const v=audio[start+j];
+          s0+=v*t0sin[j];c0+=v*t0cos[j];
+          s1+=v*t1sin[j];c1+=v*t1cos[j];
+        }
+        bits[i]=(s1*s1+c1*c1>s0*s0+c0*c0)?1:0;
+        actual++;
+      }
+      // Fast sync search; test both full-bit phase and unknown start time.
+      for(let pos=0;pos+32+16<=actual;pos++){
+        let misses=0;
+        for(let k=0;k<32;k++){
+          if(bits[pos+k]!==syncBits[k] && ++misses>2)break;
+        }
+        if(misses>2)continue;
+        const bodyPos=pos+32;
+        const head=bytesFromBits(bits,bodyPos,2);
+        const kind=head[0],size=head[1];
+        if(kind!==desiredKind || size>MAX_PAYLOAD)continue;
+        const bitsNeeded=(size+4)*8;
+        if(bodyPos+bitsNeeded>actual)continue;
+        const body=bytesFromBits(bits,bodyPos,size+4);
+        const expected=(body[body.length-2]<<8)|body[body.length-1];
+        if(crc16(body.subarray(0,body.length-2))!==expected)continue;
+        return {kind,payload:body.slice(2,-2),phase,bitPosition:pos};
+      }
+    }
+    return null;
+  }
+  return {BAUD,KIND_REQUEST,KIND_RESPONSE,crc16,frame,modulate,decode};
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = ACOUSTIC;
+
+</script>
+<script>
+(()=>{
+  const $=id=>document.getElementById(id);
+  const log=(s)=>{const line=document.createElement('div');line.textContent=`[${new Date().toLocaleTimeString()}] ${s}`;$('logs').appendChild(line);$('logs').scrollTop=$('logs').scrollHeight;};
+  const setPhase=(name, detail, percent)=>{ $('phase').textContent=name;$('detail').textContent=detail;$('progress').style.width=`${percent}%`;};
+  const busy=(flag)=>{for(const id of ['full','send','selftest']) $(id).disabled=flag;};
+  let ctx=null,stream=null,sourceNode=null,processor=null,muteNode=null;
+  let pieces=[],length=0,lastPaint=0;
+  const MAX_SECONDS=40;
+  const selected=()=>document.querySelector('input[name="site"]:checked').value;
+  const encoder=new TextEncoder(),decoder=new TextDecoder('utf-8',{fatal:false});
+  $('connection').textContent=(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)?'麦克风 API 可用':'麦克风受限；可仅发送';
+  if(!window.isSecureContext) log('提示：当前页面不是安全上下文，麦克风通常不可用。请使用 HTTPS / 受支持的 file:// 页面。');
+  log('本页不会发送 fetch() 网络请求，所有请求由声音触发 Windows 网关。');
+
+  async function ensureAudio(){
+    ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
+    await ctx.resume();
+    $('samplerate').textContent=`FSK · 200 bps · ${Math.round(ctx.sampleRate)} Hz`;
+    return ctx;
+  }
+  async function playPacket(kind,payload){
+    const pcm=ACOUSTIC.modulate(kind,payload,ctx.sampleRate);
+    const buf=ctx.createBuffer(1,pcm.length,ctx.sampleRate);
+    buf.copyToChannel(pcm,0);
+    const player=ctx.createBufferSource();
+    player.buffer=buf;
+    player.connect(ctx.destination);
+    drawWave(pcm);
+    $('meter').textContent=`TX ${(pcm.length/ctx.sampleRate).toFixed(1)} s · ${payload.length} B`;
+    await new Promise((resolve,reject)=>{player.onended=resolve;try{player.start();}catch(err){reject(err);}});
+  }
+  function drawWave(data){
+    const c=$('wave'),g=c.getContext('2d'),w=c.width,h=c.height;
+    g.clearRect(0,0,w,h);
+    g.strokeStyle='#23445b';g.beginPath();g.moveTo(0,h/2);g.lineTo(w,h/2);g.stroke();
+    if(!data||!data.length)return;
+    g.strokeStyle='#69e3d1';g.lineWidth=1.5;g.beginPath();
+    const step=Math.max(1,Math.floor(data.length/w));
+    for(let x=0;x<w;x++){
+      let min=1,max=-1;
+      for(let i=x*step;i<Math.min(data.length,(x+1)*step);i++){
+        const v=data[i];if(v<min)min=v;if(v>max)max=v;
+      }
+      g.moveTo(x,h/2-max*(h/2-5));g.lineTo(x,h/2-min*(h/2-5));
+    }
+    g.stroke();
+  }
+  async function micPermission(){
+    if(!navigator.mediaDevices?.getUserMedia) throw new Error('浏览器不提供麦克风 API。请尝试 HTTPS 页面或 Android Chrome / iPhone Safari。');
+    stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false});
+  }
+  function capture(){
+    pieces=[];length=0;
+    sourceNode=ctx.createMediaStreamSource(stream);
+    // Intentionally use ScriptProcessor for broader support in a single offline file.
+    processor=ctx.createScriptProcessor(4096,1,1);
+    muteNode=ctx.createGain();muteNode.gain.value=0;
+    sourceNode.connect(processor);processor.connect(muteNode);muteNode.connect(ctx.destination);
+    processor.onaudioprocess=(ev)=>{
+      const part=ev.inputBuffer.getChannelData(0).slice();
+      pieces.push(part);length+=part.length;
+      // Stop unbounded recording if the user leaves the page open.
+      if(length>ctx.sampleRate*MAX_SECONDS) {const old=pieces.shift();length-=old.length;}
+      const now=performance.now();
+      if(now-lastPaint>350){drawWave(part);lastPaint=now;$('meter').textContent=`RX ${(length/ctx.sampleRate).toFixed(1)} s`;}
+    };
+  }
+  function recorded(){
+    const arr=new Float32Array(length);let p=0;
+    for(const b of pieces){arr.set(b,p);p+=b.length;}
+    return arr;
+  }
+  function clearCapture(){
+    if(processor){processor.onaudioprocess=null;processor.disconnect();processor=null;}
+    if(sourceNode){sourceNode.disconnect();sourceNode=null;}
+    if(muteNode){muteNode.disconnect();muteNode=null;}
+    if(stream){stream.getTracks().forEach(track=>track.stop());stream=null;}
+    pieces=[];length=0;
+  }
+  function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+  async function experiment(full){
+    busy(true);$('result').textContent='等待发送...';
+    try{
+      await ensureAudio();
+      if(full){setPhase('请求麦克风权限','请在弹窗中允许音频录制',8);await micPermission();log('麦克风权限已开启。');}
+      const code=selected();
+      setPhase('正在播放声波请求',`向电脑发送网站编号 ${code}`,30);
+      log(`发送网站编号 ${code}，这是一条真正的声音数据帧。`);
+      await playPacket(ACOUSTIC.KIND_REQUEST,encoder.encode(code));
+      if(!full){setPhase('声波发送完成','去看电脑网关终端是否收到请求',100);$('result').textContent='已发送单向声波。如果 Windows 网关显示 CRC16 正确并返回 HTTP 结果，证明手机→电脑这段真实空气链路成功。';log('仅发送模式完成。');return;}
+      capture();
+      setPhase('等待电脑通过声音回传','请保持手机靠近电脑扬声器，网页不要离开前台',65);
+      log('开始接收麦克风声音，最长约 38 秒。');
+      const since=performance.now();
+      let success=false;
+      while(performance.now()-since<38000){
+        await delay(1700);
+        if(length<ctx.sampleRate*.5)continue;
+        const frame=ACOUSTIC.decode(recorded(),ctx.sampleRate,ACOUSTIC.KIND_RESPONSE);
+        if(frame){
+          const str=decoder.decode(frame.payload);
+          $('result').textContent=str;
+          setPhase('接收成功 · CRC16 验证通过','手机没有直接联网，数据完全从麦克风解码',100);
+          log(`成功！收到 ${frame.payload.length} B 的互联网回应。`);
+          $('meter').textContent=`成功 · ${frame.payload.length} B`;
+          success=true;
+          break;
+        }
+      }
+      if(!success){setPhase('接收超时','检查麦克风权限、距离、音量和电脑网关日志',0);$('result').textContent='没有成功解码电脑回应。先试“仅发送”，确认 Windows 网关收到 CRC16 正确的数据包；然后再测试双向通信。';log('未收到有效 CRC16 回应，可能被噪声干扰或音频设备未正常播放。');}
+    }catch(err){setPhase('发生错误',String(err.message||err),0);$('result').textContent=String(err.message||err);log(`ERROR ${err.message||err}`);}
+    finally{clearCapture();busy(false);}
+  }
+  $('full').addEventListener('click',()=>experiment(true));
+  $('send').addEventListener('click',()=>experiment(false));
+  $('selftest').addEventListener('click',()=>{
+    try{
+      const payload=encoder.encode('AcousticNet local test OK');
+      const pcm=ACOUSTIC.modulate(ACOUSTIC.KIND_RESPONSE,payload,48000);
+      const decoded=ACOUSTIC.decode(pcm,48000,ACOUSTIC.KIND_RESPONSE);
+      if(!decoded||decoder.decode(decoded.payload)!=='AcousticNet local test OK')throw new Error('自检失败');
+      $('result').textContent='PASS：JavaScript 生成 FSK → 本地解调 → CRC16 校验，完整匹配。\n注意：此项没有通过空气，不能证明设备之间的传输。';
+      setPhase('本机自检通过','浏览器声波编解码模块正常运行',100);
+      log('单机编解码自检 PASS。');drawWave(pcm);
+    }catch(err){$('result').textContent='FAIL: '+String(err);log('自检失败 '+err);}
+  });
+  drawWave(null);
+})();
+</script>
+</body>
+</html>
